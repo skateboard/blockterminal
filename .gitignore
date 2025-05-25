@@ -1,3 +1,2 @@
-/nodes
-/wallets
-cmd
+/cmd/nodes
+/cmd/wallets
