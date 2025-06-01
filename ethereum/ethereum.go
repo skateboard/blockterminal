@@ -4,11 +4,17 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"net"
 	"strings"
+	"time"
+
+	"github.com/gorilla/websocket"
+	btHttp "github.com/skatebord/blockterminal/http"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 type Ethereum struct {
@@ -21,15 +27,27 @@ type Ethereum struct {
 	erc20Contracts map[string]*erc20Contract
 }
 
-func New(name string, rpc string, wsRpc string) (*Ethereum, error) {
-	ethClient, err := ethclient.Dial(rpc)
+func New(name string, rpcUrl string, wsURL string, http *btHttp.Http) (*Ethereum, error) {
+	rpcClient, err := rpc.DialOptions(context.Background(), rpcUrl, rpc.WithHTTPClient(http.GetHttpClient()))
 	if err != nil {
 		return nil, err
 	}
+	ethClient := ethclient.NewClient(rpcClient)
 
-	ethWsClient, err := ethclient.Dial(wsRpc)
-	if err != nil {
-		return nil, err
+	var ethWsClient *ethclient.Client
+	if wsURL != "" {
+		wsDialer := websocket.Dialer{
+			NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return http.GetDialer().Dial(network, addr)
+			},
+			HandshakeTimeout: 45 * time.Second,
+		}
+
+		wsRPCClient, err := rpc.DialOptions(context.Background(), wsURL, rpc.WithWebsocketDialer(wsDialer))
+		if err != nil {
+			return nil, err
+		}
+		ethWsClient = ethclient.NewClient(wsRPCClient)
 	}
 
 	erc20Contracts := make(map[string]*erc20Contract)

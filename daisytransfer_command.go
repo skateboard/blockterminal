@@ -16,9 +16,9 @@ type DaisyTransferCommand struct {
 
 func daisyTransferCommand(terminal *Terminal) *DaisyTransferCommand {
 	return &DaisyTransferCommand{
-		BasicCommand: newBasicCommand("daisytransfer", "Transfer funds to multiple addresses to create a daisy chain", []string{
+		BasicCommand: newBasicCommand("daisytransfer", "Funnel funds through multiple wallets to create a daisy chain to a final destination", []string{
 			"<from> (loaded wallet name)",
-			"<recipient> (recipient address)",
+			"<recipient> (recipient address or loaded wallet name)",
 			"<amount>",
 			"<create_new_wallets_for_daisy_chain> (optional, will create a new wallet for each chain, default is false)",
 			"<max_depth> (optional, will default to 10)",
@@ -46,6 +46,14 @@ func (c *DaisyTransferCommand) Execute(args []string) error {
 
 	amount := args[1]
 	recipient := args[2]
+
+	toAddress := ""
+	if toWallet, err := c.terminal.wallets.GetLoadedWallet(recipient); err == nil {
+		toAddress = toWallet.Address()
+	} else {
+		toAddress = recipient
+	}
+
 	createNewWallets := args[3]
 	currency := args[4]
 	maxDepth := args[5]
@@ -147,7 +155,7 @@ func (c *DaisyTransferCommand) Execute(args []string) error {
 	// final chain wallet, send all to recipient
 	txHash, err = c.terminal.chain.SendAndConfirm(loadedWallet, recipient, amountFloat)
 	if err != nil {
-		return fmt.Errorf("failed to send and confirm (final chain: %d, recipient: %s): %v", depth-1, recipient, err)
+		return fmt.Errorf("failed to send and confirm (final chain: %d, recipient: %s): %v", depth-1, toAddress, err)
 	}
 
 	fmt.Printf("Final Chain: %s\n", txHash)

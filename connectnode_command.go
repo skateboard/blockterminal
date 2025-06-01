@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/skatebord/blockterminal/ethereum"
+	publicnodes "github.com/skatebord/blockterminal/publicNodes"
 )
 
 type ConnectNodeCommand struct {
@@ -28,14 +29,28 @@ func (c *ConnectNodeCommand) Execute(args []string) error {
 
 	nodeName := args[0]
 
-	chainConfigs, err := LoadChainConfigs()
-	if err != nil {
-		return fmt.Errorf("failed to load chain configs: %v", err)
-	}
+	var chainConfig *ChainConfig
+	if publicnodes.PublicNodes[nodeName] {
+		publicNodeConfig := publicnodes.EthereumPublicNodes[nodeName]
 
-	chainConfig, ok := chainConfigs[nodeName]
-	if !ok {
-		return fmt.Errorf("node %s not found", nodeName)
+		chainConfig = &ChainConfig{
+			Name:      publicNodeConfig.Name,
+			ChainType: publicNodeConfig.ChainType,
+			Rpc:       publicNodeConfig.RPC,
+			Ws:        publicNodeConfig.WS,
+		}
+	} else {
+		chainConfigs, err := LoadChainConfigs()
+		if err != nil {
+			return fmt.Errorf("failed to load chain configs: %v", err)
+		}
+
+		c, ok := chainConfigs[nodeName]
+		if !ok {
+			return fmt.Errorf("node %s not found", nodeName)
+		}
+
+		chainConfig = c
 	}
 
 	var chain Chain

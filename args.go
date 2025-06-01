@@ -5,21 +5,36 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/skatebord/blockterminal/http"
 	"github.com/skatebord/blockterminal/wallets"
 )
 
 var (
-	nodePath    = flag.String("node", "", "the node to automatically connect to")
+	nodePath    = flag.String("node", "", "the node path to automatically connect to")
 	walletPath  = flag.String("wallet", "", "the wallet path to automatically load")
 	walletsPath = flag.String("wallets", "", "the wallets path to automatically load a list of wallets")
+	tor         = flag.Bool("tor", false, "use tor for all http connections")
+	torPort     = flag.Int("tor-port", 9050, "the port to use for tor")
 )
 
 func (t *Terminal) parseArgs() {
-	if len(os.Args) == 0 {
+	if len(os.Args) == 0 && len(os.Args) == 1 {
 		return
 	}
 
 	flag.Parse()
+
+	if *tor && *torPort != 0 {
+		torHttp, err := http.New(true, *torPort)
+		if err != nil {
+			fmt.Println("Error creating tor http client:", err)
+			return
+		}
+
+		fmt.Printf("Using tor on port %d\n", *torPort)
+
+		t.http = torHttp
+	}
 
 	if *nodePath != "" {
 		err := t.connectNode(*nodePath)

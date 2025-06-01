@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/skatebord/blockterminal/ethereum"
+	"github.com/skatebord/blockterminal/http"
+	publicnodes "github.com/skatebord/blockterminal/publicNodes"
 	"github.com/skatebord/blockterminal/wallets"
 )
 
@@ -15,6 +17,7 @@ var (
 )
 
 type Terminal struct {
+	http  *http.Http
 	chain Chain
 
 	commandRegistry *CommandRegistry
@@ -23,9 +26,12 @@ type Terminal struct {
 }
 
 func NewTerminal() *Terminal {
+	http, _ := http.New(false, 0)
+
 	terminal := &Terminal{
 		commandRegistry: NewCommandRegistry(),
 		wallets:         wallets.NewWallets(),
+		http:            http,
 	}
 	terminal.initialize()
 	terminal.parseArgs()
@@ -56,10 +62,8 @@ func (t *Terminal) Run() {
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		// Print the custom prompt
 		fmt.Printf("%s", t.buildPrompt())
 
-		// Read user input
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Println("Error reading input:", err)
@@ -96,9 +100,22 @@ func (t *Terminal) SetChain(chain Chain) {
 }
 
 func (t *Terminal) connectNode(nodePath string) error {
-	chainConfig, err := LoadChainConfig(nodePath)
-	if err != nil {
-		return fmt.Errorf("error loading chain config: %v", err)
+	var chainConfig *ChainConfig
+	var err error
+	if publicnodes.PublicNodes[nodePath] {
+		publicNodeConfig := publicnodes.EthereumPublicNodes[nodePath]
+
+		chainConfig = &ChainConfig{
+			Name:      publicNodeConfig.Name,
+			ChainType: publicNodeConfig.ChainType,
+			Rpc:       publicNodeConfig.RPC,
+			Ws:        publicNodeConfig.WS,
+		}
+	} else {
+		chainConfig, err = LoadChainConfig(nodePath)
+		if err != nil {
+			return fmt.Errorf("error loading chain config: %v", err)
+		}
 	}
 
 	var chain Chain

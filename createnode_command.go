@@ -2,6 +2,8 @@ package terminal
 
 import (
 	"fmt"
+
+	publicnodes "github.com/skatebord/blockterminal/publicNodes"
 )
 
 type CreateNodeCommand struct {
@@ -31,6 +33,10 @@ func (c *CreateNodeCommand) Execute(args []string) error {
 	wsUrl := ""
 	if len(args) == 4 {
 		wsUrl = args[3]
+	}
+
+	if publicnodes.PublicNodes[nodeName] {
+		return fmt.Errorf("sorry but this node name is already taken by a presaved public node")
 	}
 
 	err := SaveChainConfig(fmt.Sprintf("nodes/%s.json", nodeName), &ChainConfig{
