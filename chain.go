@@ -13,8 +13,10 @@ type Chain interface {
 	GetNodeName() string
 
 	Send(fromWallet wallets.Wallet, toAddress string, amount float64) (string, error)
+	SendAndConfirm(fromWallet wallets.Wallet, toAddress string, amount float64) (string, error)
 
-	SubscribeBlockchain(address string) error
+	AddSubscribedAddress(address string)
+	SubscribeBlockchain()
 	GetBalance(address string) (map[string]float64, error)
 }
 

@@ -50,8 +50,8 @@ func (c *ConnectNodeCommand) Execute(args []string) error {
 	}
 
 	c.terminal.SetChain(chain)
-	c.terminal.SetWallet(nil)
 
 	fmt.Printf("Connected to node %s successfully\n", nodeName)
+
 	return nil
 }

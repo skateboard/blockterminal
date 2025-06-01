@@ -14,7 +14,7 @@ type LoadWalletCommand struct {
 
 func loadWalletCommand(terminal *Terminal) *LoadWalletCommand {
 	return &LoadWalletCommand{
-		BasicCommand: newBasicCommand("loadwallet", "Load a wallet", []string{
+		BasicCommand: newBasicCommand("loadwallet", "Load a specific wallet from a path", []string{
 			"<path>",
 		}),
 		terminal: terminal,
@@ -39,23 +39,15 @@ func (c *LoadWalletCommand) Execute(args []string) error {
 		return fmt.Errorf("wallet is not on the current chain! Please select the correct chain first")
 	}
 
-	_, err = wallet.Unlock()
-	if err != nil {
-		return fmt.Errorf("failed to unlock wallet: %v", err)
+	if _, err := c.terminal.wallets.GetLoadedWallet(wallet.Name()); err == nil {
+		return fmt.Errorf("wallet %s already loaded or a wallet by the same name exists", wallet.Name())
 	}
 
-	c.terminal.SetWallet(wallet)
+	c.terminal.wallets.SaveLoadedWallet(wallet)
+	c.terminal.chain.AddSubscribedAddress(wallet.Address())
 
 	fmt.Printf("Wallet %s loaded successfully\n", wallet.Name())
 	fmt.Printf("%s\n", wallet.Address())
-
-	go func() {
-		err := c.terminal.chain.SubscribeBlockchain(wallet.Address())
-		if err != nil {
-			fmt.Printf("failed to subscribe to blockchain: %v\n", err)
-			return
-		}
-	}()
 
 	return nil
 }

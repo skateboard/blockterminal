@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/skatebord/blockterminal/ethereum"
 	"github.com/skatebord/blockterminal/wallets"
 )
 
@@ -18,14 +19,16 @@ type Terminal struct {
 
 	commandRegistry *CommandRegistry
 
-	currentWallet wallets.Wallet
+	wallets *wallets.Wallets
 }
 
 func NewTerminal() *Terminal {
 	terminal := &Terminal{
 		commandRegistry: NewCommandRegistry(),
+		wallets:         wallets.NewWallets(),
 	}
 	terminal.initialize()
+	terminal.parseArgs()
 
 	return terminal
 }
@@ -34,9 +37,13 @@ func (t *Terminal) initialize() {
 	t.commandRegistry.RegisterCommands([]Command{
 		createNodeCommand(),
 		connectNodeCommand(t),
+		nodesCommand(t),
 		createWalletCommand(t),
 		loadWalletCommand(t),
+		loadWalletsCommand(t),
 		balancesCommand(t),
+		balanceCommand(t),
+		walletsCommand(t),
 		transferCommand(t),
 		infoCommand(t),
 		exitCommand(),
@@ -45,8 +52,9 @@ func (t *Terminal) initialize() {
 }
 
 func (t *Terminal) Run() {
-	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("Welcome to Blockterminal v%s\n", VERSION)
+
+	reader := bufio.NewReader(os.Stdin)
 	for {
 		// Print the custom prompt
 		fmt.Printf("%s", t.buildPrompt())
@@ -70,28 +78,43 @@ func (t *Terminal) Run() {
 }
 
 func (t *Terminal) buildPrompt() string {
-	walletName := ""
 	chainName := ""
-
-	if t.currentWallet != nil {
-		walletName = t.currentWallet.Name()
-	}
 
 	if t.chain != nil {
 		chainName = t.chain.GetNodeName()
 	}
 
-	if walletName == "" && chainName == "" {
+	if chainName == "" {
 		return "> "
 	}
 
-	return fmt.Sprintf("%s@%s> ", walletName, chainName)
+	return fmt.Sprintf("%s> ", chainName)
 }
 
 func (t *Terminal) SetChain(chain Chain) {
 	t.chain = chain
 }
 
-func (t *Terminal) SetWallet(wallet wallets.Wallet) {
-	t.currentWallet = wallet
+func (t *Terminal) connectNode(nodePath string) error {
+	chainConfig, err := LoadChainConfig(nodePath)
+	if err != nil {
+		return fmt.Errorf("error loading chain config: %v", err)
+	}
+
+	var chain Chain
+
+	switch chainConfig.ChainType {
+	case "ethereum":
+		chain, err = ethereum.New(chainConfig.Name, chainConfig.Rpc, chainConfig.Ws)
+		if err != nil {
+			return fmt.Errorf("error creating chain: %v", err)
+		}
+	}
+
+	t.SetChain(chain)
+
+	fmt.Printf("Connected to %s\n", chainConfig.Name)
+
+	return nil
+
 }

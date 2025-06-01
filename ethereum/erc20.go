@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/skatebord/blockterminal/ethereum/contracts"
 )
 
@@ -56,6 +57,15 @@ func (c *erc20Contract) Balance(address string) (float64, error) {
 	}
 
 	return float64(balance.Uint64()) / math.Pow(10, float64(decimals)), nil
+}
+
+func (c *erc20Contract) DecodeTransferEvent(log *types.Log) (*contracts.Erc20Transfer, error) {
+	transfer, err := c.contract.ParseTransfer(*log)
+	if err != nil {
+		return nil, err
+	}
+
+	return transfer, nil
 }
 
 func (c *erc20Contract) Symbol() (string, error) {

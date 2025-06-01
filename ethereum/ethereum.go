@@ -16,6 +16,8 @@ type Ethereum struct {
 	ethClient   *ethclient.Client
 	ethWsClient *ethclient.Client
 
+	subscribedAddresses map[string]bool
+
 	erc20Contracts map[string]*erc20Contract
 }
 
@@ -46,7 +48,21 @@ func New(name string, rpc string, wsRpc string) (*Ethereum, error) {
 		return nil, err
 	}
 
-	return &Ethereum{nodeName: name, ethClient: ethClient, ethWsClient: ethWsClient, erc20Contracts: erc20Contracts}, nil
+	return &Ethereum{nodeName: name,
+		ethClient:           ethClient,
+		ethWsClient:         ethWsClient,
+		erc20Contracts:      erc20Contracts,
+		subscribedAddresses: make(map[string]bool),
+	}, nil
+}
+
+func (e *Ethereum) AddSubscribedAddress(address string) {
+	if e.subscribedAddresses[address] {
+		return
+	}
+
+	e.subscribedAddresses[address] = true
+	return
 }
 
 func (e *Ethereum) Name() string {
@@ -71,6 +87,10 @@ func (e *Ethereum) GetBalance(address string) (map[string]float64, error) {
 	for _, erc20Contract := range e.erc20Contracts {
 		balance, err := erc20Contract.Balance(address)
 		if err != nil {
+			continue
+		}
+
+		if balance == 0 {
 			continue
 		}
 
@@ -104,4 +124,17 @@ func (e *Ethereum) WeiToEther(wei *big.Int) *big.Float {
 	weiFloat := new(big.Float).SetInt(wei)
 	eth := new(big.Float).Quo(weiFloat, big.NewFloat(params.Ether))
 	return eth
+}
+
+func (e *Ethereum) isErc20Contract(address string) bool {
+	_, ok := e.erc20Contracts[address]
+	return ok
+}
+
+func (e *Ethereum) GetErc20Contract(address string) (*erc20Contract, error) {
+	contract, ok := e.erc20Contracts[address]
+	if !ok {
+		return nil, fmt.Errorf("contract not found")
+	}
+	return contract, nil
 }

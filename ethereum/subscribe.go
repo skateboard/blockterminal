@@ -2,27 +2,27 @@ package ethereum
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-func (e *Ethereum) SubscribeBlockchain(address string) error {
+func (e *Ethereum) SubscribeBlockchain() {
 	if e.ethWsClient == nil {
-		return errors.New("ethereum websocket client is not initialized")
+		return
 	}
 
 	headers := make(chan *types.Header)
 	subscribe, err := e.ethWsClient.SubscribeNewHead(context.Background(), headers)
 	if err != nil {
-		return err
+		return
 	}
 
 	for {
 		select {
 		case err := <-subscribe.Err():
-			return err
+			fmt.Println(err)
+			return
 		case header := <-headers:
 			block, err := e.ethClient.BlockByHash(context.Background(), header.Hash())
 			if err != nil {
@@ -34,11 +34,44 @@ func (e *Ethereum) SubscribeBlockchain(address string) error {
 					continue
 				}
 
-				if transaction.To().String() == address {
+				address := transaction.To().String()
+
+				if e.isErc20Contract(address) {
+					erc20Contract, err := e.GetErc20Contract(address)
+					if err != nil {
+						continue
+					}
+
+					receipt, err := e.ethClient.TransactionReceipt(context.Background(), transaction.Hash())
+					if err != nil {
+						continue
+					}
+
+					log := receipt.Logs[0]
+
+					transfer, err := erc20Contract.DecodeTransferEvent(log)
+					if err != nil {
+						continue
+					}
+
+					if !e.subscribedAddresses[transfer.To.String()] {
+						continue
+					}
+
+					symbol, _ := erc20Contract.Symbol()
 					paidAmount, _ := e.WeiToEther(transaction.Value()).Float64()
 
-					fmt.Printf("[Blockterminal] %v ETH paid to %v\n", paidAmount, transaction.To().String())
+					fmt.Printf("[Blockterminal] %v %v paid to %v\n", paidAmount, symbol, transfer.To.String())
+					continue
 				}
+
+				if !e.subscribedAddresses[address] {
+					continue
+				}
+
+				paidAmount, _ := e.WeiToEther(transaction.Value()).Float64()
+
+				fmt.Printf("[Blockterminal] %v ETH paid to %v\n", paidAmount, transaction.To().String())
 			}
 		}
 	}

@@ -2,12 +2,44 @@ package ethereum
 
 import (
 	"context"
+	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/skatebord/blockterminal/wallets"
 )
+
+func (e *Ethereum) SendAndConfirm(fromWallet wallets.Wallet, toAddress string, amount float64) (string, error) {
+	txHash, err := e.Send(fromWallet, toAddress, amount)
+	if err != nil {
+		return "", err
+	}
+
+	hash := common.HexToHash(txHash)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return "", fmt.Errorf("transaction confirmation timed out")
+		default:
+			receipt, err := e.ethClient.TransactionReceipt(ctx, hash)
+			if err != nil {
+				return "", err
+			}
+
+			if receipt.Status == types.ReceiptStatusSuccessful {
+				return receipt.TxHash.Hex(), nil
+			}
+
+			time.Sleep(1 * time.Second)
+		}
+	}
+}
 
 func (e *Ethereum) Send(fromWallet wallets.Wallet, toAddress string, amount float64) (string, error) {
 	privateKeyHex, err := fromWallet.Unlock()
